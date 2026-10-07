@@ -1,0 +1,101 @@
+%%{init: {
+  'theme': 'base',
+  'themeVariables': {
+    'fontFamily': 'Helvetica, Arial, sans-serif',
+    'fontSize': '17px',
+    'primaryColor': '#ffffff',
+    'primaryTextColor': '#1e293b',
+    'primaryBorderColor': '#94a3b8',
+    'lineColor': '#64748b',
+    'clusterBkg': '#f8fafc',
+    'clusterBorder': '#cbd5e1',
+    'edgeLabelBackground': '#ffffff'
+  },
+  'flowchart': { 'curve': 'basis', 'nodeSpacing': 45, 'rankSpacing': 60, 'padding': 26, 'wrappingWidth': 300, 'htmlLabels': true }
+}}%%
+flowchart TD
+  START(["New or existing macOS device"]) --> Q1{"How is the device being<br/>enrolled?"}
+
+  %% ---- Path 1: ADE / AB zero-touch ----
+  Q1 -->|"PATH 1 — ADE zero-touch:<br/>bought via Apple / authorised<br/>reseller (serial in AB)"| ADE["Device assigned to Fleet<br/>MDM server in Apple Business"]
+  ADE --> PENDING["Host appears in Fleet<br/>as 'Pending'"]
+  PENDING --> ADE2["On first boot + internet,<br/>activation servers point<br/>device at Fleet"]
+  ADE2 --> ADE3["Setup Assistant runs<br/>(panes can be customised,<br/>IdP auth can be enforced)"]
+  ADE3 --> ADE4["Device becomes supervised;<br/>MDM profile non-removable<br/>(IsMDMRemovable = false by default;<br/>custom Setup Assistant profile<br/>can override)"]
+  ADE4 --> ADE5["Fleet MDM auto-installs fleetd<br/>+ full setup experience<br/>(managed account option,<br/>bootstrap package)"]
+  ADE5 --> ADEOUT(["Outcome: MDM status<br/>'On (automatic)' —<br/>supervised, fleetd managed,<br/>full MDM + osquery telemetry<br/>(shown as 'On (company-owned)')"])
+
+  %% ---- Path 2: fleetd package ----
+  Q1 -->|"PATH 2 — manual software<br/>deployment"| PKG["Generate installer (fleetctl or UI):<br/>fleetctl package --type pkg<br/>--fleet-url=... --enroll-secret=...<br/>(optional --fleet-desktop)"]
+  PKG --> PKG2["Install:<br/>sudo installer -pkg<br/>fleet-osquery.pkg -target /"]
+  PKG2 --> PKG3["Installs orbit + osqueryd<br/>(+ Fleet Desktop);<br/>secret stored in Keychain"]
+  PKG3 --> AGENTOUT(["Outcome: osquery-enrolled host<br/>(telemetry, queries, policies) —<br/>MDM status 'Off' unless<br/>MDM turned on separately"])
+  PKG3 -.->|"Package built with<br/>--use-system-configuration<br/>(reads config from profile,<br/>retries every 30s)"| CFG["Config delivered via MDM<br/>profile instead of embedded —<br/>Keychain NOT used on macOS<br/>in this mode"]
+  CFG --> AGENTOUT
+  CFG -.->|"If profile removed<br/>(e.g. MDM turned off),<br/>fleetd stops working until a<br/>similar profile is reinstalled"| AGENTOUT
+
+  %% ---- Path 3: plain osquery ----
+  Q1 -->|"PATH 3 — DIY osqueryd"| OSQ["Run osqueryd with flags:<br/>--enroll_secret_path,<br/>--tls_hostname, --tls_server_certs,<br/>--enroll_tls_endpoint=/api/osquery/enroll,<br/>plus TLS plugins:<br/>--config_plugin=tls, --logger_plugin=tls,<br/>--distributed_plugin=tls"]
+  OSQ --> OSQOUT(["Outcome: osquery-enrolled host,<br/>but no auto-updates, no orbit,<br/>no Fleet Desktop; secret stays<br/>on disk in a file"])
+
+  %% ---- Path 4: manual MDM on host already in Fleet ----
+  Q1 -->|"PATH 4 — manual MDM on<br/>macOS host already<br/>enrolled in Fleet (fleetd)"| MMD{"In Apple Business?"}
+  MMD -->|"Yes"| MMDA["Fleet Desktop &gt; My device &gt;<br/>'Turn on MDM' banner →<br/>steps to enroll in Remote Management<br/>(fallback: sudo profiles renew<br/>-type enrollment)"]
+  MMD -->|"No"| MMDB["Same banner → IdP sign-in<br/>if enabled → download + install<br/>manual enrolment profile"]
+  MMDA --> MMDOUT(["Outcome: MDM status<br/>'On (automatic)' — supervised<br/>(AB assignment drives status,<br/>not the trigger), wipeable,<br/>full MDM restrictions.<br/>IsMDMRemovable per the host's<br/>assigned ADE profile<br/>(false by default)<br/>(shown as 'On (company-owned)')"])
+  MMDB --> OWN{"Ownership choice<br/>at enrollment (4.94+)"}
+  OWN -->|"'Company owned'"| MMDOUT2(["Outcome: MDM status<br/>'On (manual)' — profile enrollment,<br/>company-owned: full rights<br/>incl. wipe & lock; supervised on<br/>macOS 11+, but MDM profile is<br/>user-removable (unlike ADE);<br/>no setup experience"])
+  OWN -->|"'BYOD'"| MMDOUT3(["Outcome: MDM status<br/>'On (manual - personal)' —<br/>profile enrollment, BYOD:<br/>Fleet cannot wipe or lock<br/>the device"])
+
+  %% ---- Path 4b: BYOD account-driven user enrollment (separate flow) ----
+  Q1 -->|"PATH 4b — BYOD account-driven<br/>user enrollment (separate flow):<br/>personal iPhone or iPad<br/>(ADUE is iOS/iPadOS only;<br/>macOS BYOD uses PATH 4<br/>profile enrollment)"| BYOD["Admin: connect Apple Business,<br/>verify domain, connect IdP,<br/>create fleet for personal hosts.<br/>User: enrols from device Settings<br/>with Managed Apple Account —<br/>NOT from Fleet Desktop"]
+  BYOD --> BYODOUT(["Outcome (4.94+): profile enrollment<br/>→ 'On (manual - personal)' if user<br/>chose BYOD (no wipe/lock rights);<br/>ADUE → 'On (personal)' —<br/>ADUE not available for macOS.<br/>Data separation; IT cannot<br/>wipe or lock the device"])
+
+  %% ---- Path 5: migration from another MDM ----
+  Q1 -->|"PATH 5 — MDM migration:<br/>moving from existing MDM<br/>(macos_migration)"| MIG["1. Install fleetd agent<br/>(Default / End user only)<br/>2. Reassign host to Fleet in Apple Business<br/>3. Pick workflow"]
+  MIG -->|"Default workflow:<br/>IT admin unenrols from<br/>old MDM (needs local<br/>admin on Mac)"| MIG2["Apple Remote Management<br/>full-screen prompt appears<br/>typically within 2 hours<br/>(per Fleet docs; if assigned<br/>in AB); else profile from<br/>My device page"]
+  MIG -->|"End user workflow (Premium +<br/>fleetd auto-updates) —<br/>modes: Voluntary or Forced.<br/>Voluntary: user picks<br/>'Migrate to Fleet' in menu bar;<br/>Forced: Fleet shows the<br/>migration dialog every<br/>~15-20 minutes without<br/>user initiation"| MIG3["Fleet sends webhook to your<br/>automation (e.g. Tines) to unenrol<br/>from old MDM — smaller<br/>coverage gap"]
+  MIG -->|"macOS 26 Tahoe:<br/>Apple-native migration<br/>(no fleetd needed)"| MIG4["Apple's native AB migration runs<br/>with or without fleetd installed —<br/>it's a native feature; fleetd is<br/>installed as an outcome of<br/>MDM enrollment<br/>(admin or standard user;<br/>'migrate in batches' per<br/>Fleet's Tahoe 26 article)"]
+  MIG2 --> MIGOUT(["Outcome: MDM-enrolled (like<br/>automatic), after a coverage<br/>gap; fleetd installed,<br/>but no full setup experience<br/>(no managed account or<br/>bootstrap package by default)<br/>(status shown as<br/>'On (company-owned)')"])
+  MIG3 --> MIGOUT
+  MIG4 --> MIGOUT
+
+  %% ---- Path 6: already-in-use Mac, assigned in AB, no wipe ----
+  Q1 -->|"PATH 6 — already-in-use Mac,<br/>assigned in AB, no wipe:<br/>set up + running, serial<br/>assigned to Fleet in<br/>Apple Business"| REN{"What triggers the prompt?"}
+  REN -->|"Apple native: reboot,<br/>macOS upgrade, or periodic<br/>check-in with activation servers"| RENA["macOS 14+: Apple ties the<br/>full-screen prompt (with one<br/>'Not now' = 8h deferral, then<br/>enroll or erase) to the<br/>profiles renew experience;<br/>macOS 13.5 or earlier:<br/>2-hourly notifications apply to<br/>Macs that weren't online during<br/>initial configuration"]
+  REN -->|"Fleet-triggered (pending<br/>device + fleetd): orbit gets<br/>RenewEnrollmentProfile<br/>notification, runs<br/>'profiles renew -type enrollment'"| RENB["Fleet Desktop shows its<br/>migration dialog every few<br/>minutes until enrolled<br/>(Fleet-side prompting);<br/>orbit retries the renew<br/>command at &gt;= 2-minute<br/>intervals on failure"]
+  REN -.->|"Manual: sudo profiles renew<br/>-type enrollment"| REN3["User approves with local<br/>admin password in<br/>System Settings"]
+  RENB -.->|"CAVEAT: macOS 13+ limits<br/>profiles show/validate/renew<br/>to 10 requests per 24h on<br/>AB-listed, org-owned Macs —<br/>applies to manual AND<br/>fleetd-triggered paths"| REN3
+  RENA --> REN3
+  RENB --> REN3
+  REN3 --> RENOUT(["Outcome: supervised, MDM-enrolled,<br/>fleetd installed — close to ADE<br/>end state but setup experience<br/>skipped; MDM status 'On (automatic)'<br/>(installed_from_dep = true<br/>from AB assignment)<br/>(shown as 'On (company-owned)')"])
+  NOTE2["Deploying the fleetd agent alone<br/>does NOT trigger the prompt —<br/>the Apple Business assignment does"]
+  NOTE2 -.-> REN
+
+  %% Legend
+  subgraph LEGEND["How to read"]
+    L1["Solid = enrolment flow"] --- L2["Dashed = optional /<br/>intermediate state / caveat"]
+  end
+
+  classDef default fill:#ffffff,stroke:#94a3b8,stroke-width:1.5px,color:#1e293b,rx:10,ry:10
+  classDef start fill:#1e293b,stroke:#0f172a,stroke-width:2px,color:#ffffff
+  classDef decision fill:#ede9fe,stroke:#7c3aed,stroke-width:2px,color:#3b0764
+  classDef pending fill:#fef9c3,stroke:#ca8a04,stroke-width:1.5px,color:#422006
+  classDef full fill:#d1fae5,stroke:#059669,stroke-width:2.5px,color:#064e3b
+  classDef agent fill:#dbeafe,stroke:#2563eb,stroke-width:2.5px,color:#1e3a8a
+  classDef manual fill:#ffedd5,stroke:#ea580c,stroke-width:2.5px,color:#7c2d12
+  classDef warn fill:#fee2e2,stroke:#dc2626,stroke-width:1.5px,color:#7f1d1d,stroke-dasharray:5 3
+  classDef caveat fill:#fff7ed,stroke:#f97316,stroke-width:1.5px,color:#7c2d12,stroke-dasharray:5 3
+
+  class START start
+  class Q1,MMD,REN,OWN decision
+  class PENDING pending
+  class ADEOUT,MIGOUT,RENOUT full
+  class AGENTOUT,OSQOUT agent
+  class MMDOUT,MMDOUT2,MMDOUT3,BYODOUT manual
+  class NOTE2 warn
+  class CFG caveat
+  class L1,L2 pending
+
+  linkStyle default stroke:#64748b,stroke-width:1.6px
+  style LEGEND fill:#f8fafc,stroke:#cbd5e1,stroke-width:1px,color:#475569
