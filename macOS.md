@@ -1,3 +1,4 @@
+```mermaid
 %%{init: {
   'theme': 'base',
   'themeVariables': {
@@ -99,3 +100,4 @@ flowchart TD
 
   linkStyle default stroke:#64748b,stroke-width:1.6px
   style LEGEND fill:#f8fafc,stroke:#cbd5e1,stroke-width:1px,color:#475569
+```
