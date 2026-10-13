@@ -17,18 +17,15 @@
 flowchart TD
   START(["New or existing Android device"]) --> Q1{"How is the device being<br/>enrolled?"}
 
-  REQ["PREREQUISITE for ALL paths:<br/>Android Enterprise connected<br/>to Fleet (managed Google Play,<br/>Android Management API)"]
+  REQ["PREREQUISITE for ALL paths:<br/>Android Enterprise connected<br/>to Fleet — the FREE Android<br/>Enterprise subscription suffices.<br/>Self-hosted Fleet servers also<br/>need outbound access to Google<br/>(Pub/Sub)"]
 
   %% ---- PATH 1: fully managed (COBO) ----
   Q1 -->|"PATH 1 — company-owned,<br/>fully managed device (COBO)"| COBO{"How is it provisioned?"}
-  COBO -->|"Zero-touch enrollment:<br/>device configured in the<br/>Android zero-touch portal<br/>(Fleet provides the<br/>DPC extras JSON)"| ZT["New, unboxed device:<br/>provisions itself during<br/>first-run setup, no user<br/>action needed"]
+  COBO -->|"Zero-touch enrollment<br/>(Fleet PREMIUM): device<br/>configured in the Android<br/>zero-touch portal (Fleet<br/>provides the DPC extras JSON)"| ZT["New, unboxed device:<br/>provisions itself during<br/>first-run setup. NO end-user<br/>authentication (no IdP<br/>browser flow) — so IdP<br/>variables in certificates<br/>won't work on these hosts.<br/>Always enrolls into the<br/>'Unassigned' fleet"]
   COBO -->|"QR code (device not<br/>zero-touch enabled):<br/>new or FACTORY-RESET device,<br/>tap welcome screen 6 times,<br/>scan Fleet's QR code<br/>(fully_managed=true)"| QR["User scans QR, connects<br/>to Wi-Fi, follows the<br/>setup wizard"]
-  COBO -->|"Knox Mobile Enrollment:<br/>Samsung zero-touch variant"| KNOX["Samsung device provisions<br/>itself on first run / reset<br/>(via Knox portal assignment)"]
-  ZT --> PENDING["Hosts awaiting automatic<br/>enrollment appear in Fleet<br/>as 'Pending'"]
-  QR --> COBOOUT
-  KNOX --> PENDING
-  PENDING --> COBOOUT(["Outcome: MDM status<br/>'On (company-owned)' —<br/>IT fully controls settings,<br/>apps and data; IT CAN wipe<br/>the entire device"])
   ZT --> COBOOUT
+  QR --> COBOOUT
+  COBO --> COBOOUT(["Outcome: MDM status<br/>'On (company-owned)' —<br/>IT fully controls settings,<br/>apps and data; IT CAN wipe<br/>the entire device"])
 
   %% ---- PATH 2: work profile (BYOD) ----
   Q1 -->|"PATH 2 — personally-owned<br/>device (BYOD / BYO):<br/>work profile"| WP["IT admin shares an enrollment<br/>link (or QR code) — this URL<br/>does NOT include<br/>fully_managed=true"]
@@ -36,10 +33,18 @@ flowchart TD
   WP2 --> WP3["Work profile created: work<br/>apps show a briefcase icon;<br/>company data stays inside<br/>the profile"]
   WP3 --> WPOUT(["Outcome: MDM status<br/>'On (personal)' —<br/>data separation; IT manages<br/>ONLY the work profile:<br/>can lock the work profile and<br/>clear its passcode; CANNOT wipe<br/>the whole device or lock the<br/>user out of personal data.<br/>Unenrolling removes ONLY the<br/>work profile (AMAPI WIPE).<br/>Note: after unenrollment the<br/>status PERSISTS as<br/>'On (personal)' (vs 'Off' for<br/>company-owned)"])
 
+  %% ---- PATH 3: BYOD migration ----
+  Q1 -->|"PATH 3 — migrating a personal<br/>device from another<br/>work-profile MDM (no wipe)"| AMIG["User removes the old<br/>work profile (removes only<br/>work data, personal data<br/>stays), then enrolls in<br/>Fleet via PATH 2"]
+  AMIG --> WP
+
   %% ---- Agent note ----
-  AGENT["Fleet's Android agent app is<br/>installed silently via managed<br/>Google Play after enrollment —<br/>it adds setup experience and<br/>telemetry but does NOT change<br/>the MDM enrollment status"]
+  AGENT["Fleet's Android agent app is<br/>installed via managed Google Play<br/>(silently; Android Device Policy<br/>assigns it COMPANION_APP role,<br/>auto-starting it) — it adds setup<br/>experience and telemetry but does<br/>NOT change the MDM enrollment status"]
   AGENT -.-> COBOOUT
   AGENT -.-> WPOUT
+
+  %% ---- Global caveat ----
+  DESTR["CAVEAT: turning off Android MDM in<br/>Fleet (or deleting the Android<br/>Enterprise in Google Admin) turns<br/>off MDM on all hosts and DELETES<br/>the work profile from all<br/>Android hosts"]
+  DESTR -.-> REQ
 
   REQ -.-> Q1
 
@@ -61,10 +66,10 @@ flowchart TD
 
   class START start
   class Q1,COBO decision
-  class PENDING,REQ pending
+  class REQ pending
   class COBOOUT full
   class WPOUT byod
-  class AGENT warn
+  class AGENT,DESTR warn
   class L1,L2 pending
 
   linkStyle default stroke:#64748b,stroke-width:1.6px
