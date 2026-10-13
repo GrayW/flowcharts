@@ -17,7 +17,7 @@
 flowchart TD
   START(["New or existing Windows PC"]) --> Q1{"How is the device being<br/>enrolled?"}
 
-  REQ["PREREQUISITE for MDM paths:<br/>Windows MDM turned on in Fleet<br/>(WSTEP certificate + key).<br/>Windows Pro / Enterprise /<br/>Education required —<br/>Windows Home CANNOT enroll"]
+  REQ["PREREQUISITE for MDM paths:<br/>Windows MDM turned on in Fleet<br/>(WSTEP certificate + key).<br/>Windows Home CANNOT enroll<br/>(MDM not supported)"]
 
   %% ---- PATH 1: Entra ID automatic enrollment at OOBE ----
   Q1 -->|"PATH 1 — Entra ID automatic<br/>enrollment at OOBE<br/>(Premium; the base zero-touch<br/>flow — Autopilot is a<br/>customization on top)"| ENTRA["User picks 'Set up for<br/>work or school' at OOBE and<br/>signs in with Microsoft<br/>Entra ID (Fleet connected<br/>to Entra ID, automatic<br/>enrollment configured)"]
@@ -29,19 +29,20 @@ flowchart TD
   AP --> AP2["User signs in with<br/>Microsoft Entra ID —<br/>device joins Entra ID and<br/>enrolls in Fleet MDM"]
   AP2 --> ESP
   AP -.->|"OPTIONAL Graph sync (Premium):<br/>app registration with<br/>DeviceManagementServiceConfig.<br/>Read.All; syncs every 5 min;<br/>matched by serial number,<br/>placeholder serials skipped"| PENDING["Host appears in Fleet<br/>as 'Pending' before<br/>enrollment"]
+  PENDING -.-> AP2
 
   %% ---- PATH 2: manual fleetd MSI ----
   Q1 -->|"PATH 2 — manual software<br/>deployment"| PKG["Generate installer:<br/>fleetctl package --type msi<br/>--fleet-url=... --enroll-secret=...<br/>(optional --fleet-desktop)"]
   PKG --> PKG2["Run MSI on the device,<br/>or deploy via provisioning<br/>package to preinstall fleetd<br/>before the user finishes<br/>Windows setup (aimed at<br/>devices that DON'T join Entra)"]
   PKG2 --> PKG3["Installs orbit + osqueryd<br/>(+ Fleet Desktop);<br/>osquery telemetry flows<br/>immediately"]
-  PKG3 --> AGENTOUT(["Outcome: osquery-enrolled host.<br/>With 'Turn on MDM programmatically'<br/>enabled (documented best practicewindows.md),<br/>Fleet turns on MDM for these hosts —<br/>BUT Windows MDM enrollment completes<br/>in a USER context: status stays 'Off'<br/>at the lock screen until someone signs<br/>in (Fleet retries and completes within<br/>~30 seconds of the next sign-in; MDM<br/>cert in SYSTEM store). With it disabled,<br/>MDM stays 'Off' — use PATH 4 instead.<br/>fleetd-first hosts keep the fleet from<br/>their enroll secret, not the default fleet"])
+  PKG3 --> AGENTOUT(["Outcome: osquery-enrolled host.<br/>With 'Turn on MDM programmatically'<br/>enabled (documented best practice),<br/>Fleet turns on MDM for these hosts —<br/>BUT Windows MDM enrollment completes<br/>in a USER context: status stays 'Off'<br/>at the lock screen until someone signs<br/>in (Fleet retries and completes within<br/>~30 seconds of the next sign-in; MDM<br/>cert in SYSTEM store). With it disabled,<br/>MDM stays 'Off' — use PATH 4 instead.<br/>fleetd-first hosts keep the fleet from<br/>their enroll secret, not the default fleet"])
 
   %% ---- PATH 3: plain osquery ----
   Q1 -->|"PATH 3 — DIY osqueryd"| OSQ["Run osqueryd with flags:<br/>--enroll_secret_path,<br/>--tls_hostname, --tls_server_certs,<br/>--enroll_tls_endpoint=/api/osquery/enroll,<br/>plus TLS plugins:<br/>--config_plugin=tls, --logger_plugin=tls,<br/>--distributed_plugin=tls"]
   OSQ --> OSQOUT(["Outcome: osquery-enrolled host,<br/>no auto-updates, no orbit,<br/>no Fleet Desktop;<br/>MDM status 'Off'"])
 
   %% ---- PATH 4: manual MDM via Settings ----
-  Q1 -->|"PATH 4 — manual MDM enrollment<br/>(user is signed in;<br/>also the fallback when<br/>'Turn on MDM programmatically'<br/>is disabled)"| WM["User: Settings &gt; Accounts &gt;<br/>Access work or school &gt;<br/>Connect — enters work email;<br/>Fleet discovered via Entra ID<br/>(Fleet collects the user's email<br/>as IdP username)"]
+  Q1 -->|"PATH 4 — manual MDM enrollment<br/>(Premium; Fleet connected to<br/>Microsoft Entra ID; user is<br/>signed in; also the fallback when<br/>'Turn on MDM programmatically'<br/>is disabled)"| WM["User: Settings &gt; Accounts &gt;<br/>Access work or school &gt;<br/>Connect — enters work email;<br/>Fleet discovered via Entra ID<br/>(Fleet collects the user's email<br/>as IdP username)"]
   WM --> WM2["User prompted to set up<br/>Windows Hello and add a PIN"]
   WM2 --> WMOUT(["Outcome: MDM status<br/>'On (manual)'. Default MDM<br/>fleet applies when hosts<br/>enroll in MDM BEFORE fleetd<br/>is installed (the Autopilot<br/>order)"])
 
@@ -53,6 +54,8 @@ flowchart TD
   REQ -.-> ENTRA
   REQ -.-> AP
   REQ -.-> WM
+  REQ -.-> PKG
+  REQ -.-> MIG
 
   %% Legend
   subgraph LEGEND["How to read"]
