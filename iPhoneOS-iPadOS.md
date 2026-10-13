@@ -33,7 +33,8 @@ flowchart TD
   %% ---- PATH 3: ADUE (personal / BYOD) ----
   Q1 -->|"PATH 3 — Account-driven User<br/>Enrollment (personal / BYOD):<br/>user's own device"| ADUE["Admin one-time: connect AB,<br/>verify domain, connect IdP,<br/>create fleet for personal hosts.<br/>User: Settings &gt; General &gt; VPN &<br/>Device Management &gt; Sign in to<br/>Work or School Account (IdP<br/>credentials)"]
   ADUE --> ADUE2["iOS/iPadOS creates separate<br/>volumes for personal and<br/>work data (data separation)"]
-  ADUE2 --> ADUEOUT(["Outcome: MDM status<br/>'On (personal)' — unsupervised,<br/>data separation; IT manages<br/>work settings/apps only;<br/>IT CANNOT wipe or lock.<br/>Privacy: personal BYOD hosts<br/>do NOT receive the extended<br/>MDM vitals; software inventory<br/>only for Fleet-installed apps"])
+  ADUE2 -.->|"Self-hosted Fleet + iOS BELOW<br/>18.2: host a service discovery<br/>JSON ('Version': 'mdm-byod') —<br/>with it, hosts always enroll to<br/>'Unassigned'. iOS 18.2+ doesn't<br/>need the file"| ADUEOUT
+  ADUE2 --> ADUEOUT(["Outcome: MDM status<br/>'On (personal)' — unsupervised,<br/>data separation; IT manages<br/>work settings/apps only;<br/>IT CANNOT wipe or lock.<br/>NO serial number collected and<br/>host vitals limited (privacy):<br/>identifying details (uuid,<br/>serial, hostname, display name,<br/>labels, MDM profile data) are<br/>omitted; software inventory only<br/>for Fleet-installed apps"])
 
   %% ---- PATH 4: manual BYOD enroll link ----
   Q1 -->|"PATH 4 — manual BYOD<br/>enroll link<br/>(/enroll?enroll_secret=...<br/>&byod=true): personal device,<br/>no AB / ADUE setup"| MBYOD["User taps enroll link →<br/>Allow profile download →<br/>Settings &gt; Profile Downloaded →<br/>Install → Trust on Remote<br/>Management screen"]
