@@ -49,7 +49,7 @@ flowchart TD
   OWN -->|"'BYOD'"| MMDOUT3(["Outcome: MDM status<br/>'On (manual - personal)' —<br/>profile enrollment, BYOD:<br/>Fleet cannot wipe or lock<br/>the device"])
 
   %% ---- Path 4b: BYOD account-driven user enrollment (separate flow) ----
-  Q1 -->|"PATH 4b — BYOD account-driven<br/>user enrollment (separate flow):<br/>personal iPhone or iPad<br/>(ADUE is iOS/iPadOS only;<br/>macOS BYOD uses PATH 4<br/>profile enrollment)"| BYOD["Admin: connect Apple Business,<br/>verify domain, connect IdP,<br/>create fleet for personal hosts.<br/>User: enrols from device Settings<br/>with Managed Apple Account —<br/>NOT from Fleet Desktop"]
+  Q1 -->|"PATH 4b — BYOD account-driven<br/>user enrollment (separate flow):<br/>personal iPhone or iPad only —<br/>Fleet does NOT support ADUE on<br/>macOS (Apple lists it for<br/>macOS 14+); macOS BYOD uses<br/>PATH 4 profile enrollment"| BYOD["Admin: connect Apple Business,<br/>verify domain, connect IdP,<br/>create fleet for personal hosts.<br/>User: enrols from device Settings<br/>with Managed Apple Account —<br/>NOT from Fleet Desktop"]
   BYOD --> BYODOUT(["Outcome (4.94+): profile enrollment<br/>→ 'On (manual - personal)' if user<br/>chose BYOD (no wipe/lock rights);<br/>ADUE → 'On (personal)' —<br/>ADUE not available for macOS.<br/>Data separation; IT cannot<br/>wipe or lock the device"])
 
   %% ---- Path 5: migration from another MDM ----
