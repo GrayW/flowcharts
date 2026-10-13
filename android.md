@@ -23,9 +23,8 @@ flowchart TD
   Q1 -->|"PATH 1 — company-owned,<br/>fully managed device (COBO)"| COBO{"How is it provisioned?"}
   COBO -->|"Zero-touch enrollment<br/>(Fleet PREMIUM): device<br/>configured in the Android<br/>zero-touch portal (Fleet<br/>provides the DPC extras JSON)"| ZT["New, unboxed device:<br/>provisions itself during<br/>first-run setup. NO end-user<br/>authentication (no IdP<br/>browser flow) — so IdP<br/>variables in certificates<br/>won't work on these hosts.<br/>Always enrolls into the<br/>'Unassigned' fleet"]
   COBO -->|"QR code (device not<br/>zero-touch enabled):<br/>new or FACTORY-RESET device,<br/>tap welcome screen 6 times,<br/>scan Fleet's QR code<br/>(fully_managed=true)"| QR["User scans QR, connects<br/>to Wi-Fi, follows the<br/>setup wizard"]
-  ZT --> COBOOUT
   QR --> COBOOUT
-  COBO --> COBOOUT(["Outcome: MDM status<br/>'On (company-owned)' —<br/>IT fully controls settings,<br/>apps and data; IT CAN wipe<br/>the entire device"])
+  ZT --> COBOOUT(["Outcome: MDM status<br/>'On (company-owned)' —<br/>IT fully controls settings,<br/>apps and data; IT CAN wipe<br/>the entire device"])
 
   %% ---- PATH 2: work profile (BYOD) ----
   Q1 -->|"PATH 2 — personally-owned<br/>device (BYOD / BYO):<br/>work profile"| WP["IT admin shares an enrollment<br/>link (or QR code) — this URL<br/>does NOT include<br/>fully_managed=true"]
